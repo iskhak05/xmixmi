@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Калькулятор рассрочки</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 10px;
+            padding: 10px;
+        }
+        form {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        label {
+            display: block;
+            margin: 10px 0 5px;
+        }
+        input, select, button {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0 20px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #result {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 1.2em;
+        }
+        #paymentSchedule {
+            margin-top: 20px;
+            max-width: 100%;
+            margin: 20px auto;
+            border-collapse: collapse;
+            width: 100%;
+        }
+        #paymentSchedule th, #paymentSchedule td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        #paymentSchedule th {
+            padding-top: 12px;
+            padding-bottom: 12px;
+            text-align: left;
+            background-color: #4CAF50;
+            color: white;
+        }
+        @media (max-width: 600px) {
+            #paymentSchedule th, #paymentSchedule td {
+                padding: 4px;
+            }
+            canvas {
+                width: 100% !important;
+                height: auto !important;
+            }
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>Калькулятор рассрочки</h1>
+    <form id="calculator">
+        <label for="amount">Сумма:</label>
+        <input type="number" id="amount" name="amount"><br><br>
+        
+        <label for="initialPayment">Первоначальный взнос:</label>
+        <input type="number" id="initialPayment" name="initialPayment"><br><br>
+        
+        <label for="bank">Банк:</label>
+        <select id="bank" name="bank">
+            <option value="bank1">IslamiCo</option>
+            <option value="bank2">MBANK</option>
+            <option value="bank3">BAKAI BANK</option>
+        </select><br><br>
+
+        <label for="months">Срок (в месяцах):</label>
+        <select id="months" name="months">
+            <option value="3">3</option>
+            <option value="6">6</option>
+            <option value="9">9</option>
+            <option value="12">12</option>
+            <option value="18">18</option>
+        </select><br><br>
+
+        <button type="button" onclick="calculate()">Рассчитать</button>
+        <button type="button" onclick="resetForm()">Сбросить</button>
+    </form>
+
+    <p id="result"></p>
+
+    <table id="paymentSchedule">
+        <thead>
+            <tr>
+                <th>Месяц</th>
+                <th>Сумма платежа</th>
+                <th>Остаток долга</th>
+            </tr>
+        </thead>
+        <tbody id="scheduleBody">
+        </tbody>
+    </table>
+
+    <canvas id="paymentChart" width="400" height="200"></canvas>
+
+    <script>
+        function calculate() {
+            const amount = parseFloat(document.getElementById('amount').value);
+            const initialPayment = parseFloat(document.getElementById('initialPayment').value);
+            const bank = document.getElementById('bank').value;
+            const months = parseInt(document.getElementById('months').value);
+
+            if (isNaN(amount) || isNaN(initialPayment) || isNaN(months) || amount <= 0 || initialPayment < 0 || months <= 0) {
+                alert("Пожалуйста, введите корректные значения.");
+                return;
+            }
+
+            const principal = amount - initialPayment;
+
+            let rate;
+            switch (bank) {
+                case 'bank1':
+                    if (months == 3) rate = 0.15;
+                    else if (months == 6) rate = 0.25;
+                    else if (months == 9) rate = 0.35;
+                    break;
+                case 'bank2':
+                    if (months == 3) rate = 0.0521;
+                    else if (months == 6) rate = 0.0923;
+                    else if (months == 9) rate = 0.1336;
+                    else if (months == 12) rate = 0.1758;
+                    else if (months == 18) rate = 0.2631;
+                    break;
+                case 'bank3':
+                    if (months == 3) rate = 0.04;
+                    else if (months == 6) rate = 0.06;
+                    else if (months == 9) rate = 0.09;
+                    else if (months == 12) rate = 0.11;
+                    else if (months == 18) rate = 0.22;
+                    break;
+            }
+
+            const monthlyPayment = (principal * (1 + rate)) / months;
+            const totalPayment = monthlyPayment * months;
+
+            document.getElementById('result').innerText = 
+                `Ежемесячный платеж: ${monthlyPayment.toFixed(2)}\nОбщая сумма выплат: ${totalPayment.toFixed(2)}`;
+
+            // Расчет графика платежей
+            let remainingAmount = principal;
+            const scheduleBody = document.getElementById('scheduleBody');
+            scheduleBody.innerHTML = '';
+            const paymentSchedule = [];
+            const remainingAmounts = [];
+
+            for (let i = 1; i <= months; i++) {
+                remainingAmount -= monthlyPayment;
+                remainingAmount = remainingAmount < 0 ? 0 : remainingAmount; // не уходить в минус
+                paymentSchedule.push(monthlyPayment.toFixed(2));
+                remainingAmounts.push(remainingAmount.toFixed(2));
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${i}</td>
+                    <td>${monthlyPayment.toFixed(2)}</td>
+                    <td>${remainingAmount.toFixed(2)}</td>
+                `;
+                scheduleBody.appendChild(row);
+            }
+
+            // Создание графика
+            const ctx = document.getElementById('paymentChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({ length: months }, (_, i) => i + 1),
+                    datasets: [{
+                        label: 'Остаток долга',
+                        data: remainingAmounts,
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 2,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            beginAtZero: true
+                        },
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function resetForm() {
+            document.getElementById('calculator').reset();
+            document.getElementById('result').innerText = '';
+            document.getElementById('scheduleBody').innerHTML = '';
+        }
+    </script>
+</body>
+</html>
